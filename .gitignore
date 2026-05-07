@@ -1,0 +1,30 @@
+# IDE ignore
+*.ipr
+*.iml
+*.iws
+
+# temp ignore
+*.log
+*.cache
+*.diff
+*.exe
+*.exe~
+*.patch
+*.tmp
+*.swp
+*.out
+*.~
+
+# system ignore
+.DS_Store
+Thumbs.db
+stdout
+
+# build
+/target
+/configs
+/dist
+
+local.yaml
+.*/
+/node_modules

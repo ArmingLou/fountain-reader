@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fountain Reader</title>
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+
+  <body>
+    <div class="app-container">
+      <!-- 工具栏 -->
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <button id="open-btn" class="toolbar-btn" title="Open File (Cmd+O)">📂 Open</button>
+          <div class="toolbar-sep"></div>
+          <button id="export-pdf-btn" class="toolbar-btn" title="Export PDF (Cmd+Shift+E)">📄 PDF</button>
+          <button id="export-docx-btn" class="toolbar-btn" title="Export DOCX (Cmd+Shift+D)">📝 DOCX</button>
+        </div>
+        <div class="toolbar-right">
+          <button id="settings-btn" class="toolbar-btn" title="Settings (Cmd+,)">⚙️</button>
+          <button id="refresh-btn" class="toolbar-btn" title="Refresh (F5)">🔄</button>
+        </div>
+      </header>
+
+      <!-- Tab 导航栏 -->
+      <nav class="tab-nav">
+        <button class="tab-btn active" data-tab="pdf-preview">📄 PDF Preview</button>
+        <button class="tab-btn" data-tab="docx-preview">📝 DOCX Preview</button>
+        <button class="tab-btn" data-tab="statistics">📊 Statistics</button>
+        <button class="tab-btn" data-tab="outline">📑 Outline</button>
+        <button class="tab-btn" data-tab="settings">⚙️ Settings</button>
+      </nav>
+
+      <!-- 主内容区域 -->
+      <main class="content">
+        <div class="file-info">
+          <span id="file-name">No file loaded</span>
+        </div>
+
+        <!-- PDF 预览面板 -->
+        <div id="pdf-preview-panel" class="tab-panel active">
+          <div class="panel-toolbar">
+            <button id="pdf-prev-page">◀</button>
+            <span id="pdf-page-info">1 / 1</span>
+            <button id="pdf-next-page">▶</button>
+            <input type="range" id="pdf-zoom" min="50" max="200" value="100">
+            <span id="pdf-zoom-level">100%</span>
+          </div>
+          <div id="pdf-viewer" class="preview-container">
+            <p class="placeholder">Open a Fountain file to preview PDF</p>
+          </div>
+        </div>
+
+        <!-- DOCX 预览面板 -->
+        <div id="docx-preview-panel" class="tab-panel">
+          <div id="docx-viewer" class="preview-container">
+            <p class="placeholder">Open a Fountain file to preview DOCX</p>
+          </div>
+        </div>
+
+        <!-- 统计面板 -->
+        <div id="statistics-panel" class="tab-panel">
+          <div class="stats-layout">
+            <aside class="stats-nav">
+              <div class="stats-nav-title">📊 Statistics</div>
+              <ul>
+                <li data-group="overview" class="active">⭐ Overview</li>
+                <li data-group="characters">👥 Characters</li>
+                <li data-group="scenes">🎬 Scenes</li>
+              </ul>
+            </aside>
+            <div class="stats-main">
+              <div data-group="overview" class="stats-group active">
+                <h1>📏 Length</h1>
+                <div class="flexgroup">
+                  <div class="flexitem"><div class="desc">Pages</div><div class="num" id="len-pages">0</div></div>
+                  <div class="flexitem"><div class="desc">Scenes</div><div class="num" id="len-scenes">0</div></div>
+                  <div class="flexitem"><div class="desc">Words</div><div class="num" id="len-words">0</div></div>
+                  <div class="flexitem"><div class="desc">Chars</div><div class="num" id="len-chars">0</div></div>
+                </div>
+                <h1>⏱️ Duration</h1>
+                <div class="flexgroup">
+                  <div class="flexitem"><div class="desc">Total</div><div class="num" id="dur-total">0:00</div></div>
+                  <div class="flexitem"><div class="desc">Action</div><div class="num" id="dur-action">0:00</div></div>
+                  <div class="flexitem"><div class="desc">Dialogue</div><div class="num" id="dur-dialogue">0:00</div></div>
+                </div>
+                <div id="dur-chart" class="chart" style="height:200px"></div>
+              </div>
+              <div data-group="characters" class="stats-group">
+                <h1>👥 Characters</h1>
+                <div class="flexgroup">
+                  <div class="flexitem"><div class="desc">Count</div><div class="num" id="char-count">0</div></div>
+                  <div class="flexitem"><div class="desc">Monologues</div><div class="num" id="char-monologues">0</div></div>
+                </div>
+                <div id="char-chart" class="chart" style="height:256px"></div>
+                <table id="char-table" class="data-table"></table>
+              </div>
+              <div data-group="scenes" class="stats-group">
+                <h1>🎬 Scenes</h1>
+                <div class="flexgroup">
+                  <div class="flexitem"><div class="desc">Scenes</div><div class="num" id="scene-count">0</div></div>
+                  <div class="flexitem"><div class="desc">Locations</div><div class="num" id="loc-count">0</div></div>
+                </div>
+                <div id="scene-chart" class="chart" style="height:180px"></div>
+                <table id="loc-table" class="data-table"></table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 大纲面板 -->
+        <div id="outline-panel" class="tab-panel">
+          <div class="outline-toolbar">
+          </div>
+          <div id="outline-tree" class="outline-tree">
+            <p class="placeholder">Open a Fountain file to see outline</p>
+          </div>
+        </div>
+
+        <!-- 设置面板 -->
+        <div id="settings-panel" class="tab-panel">
+          <div class="settings-container">
+            <section class="settings-section">
+              <h3>External Editor</h3>
+              <div class="settings-group">
+                <label class="setting-row">
+                  <span>Editor</span>
+                  <select id="editor-select">
+                    <option value="zed">Zed</option>
+                    <option value="code">VSCode</option>
+                    <option value="subl">Sublime Text</option>
+                    <option value="atom">Atom</option>
+                    <option value="custom">Custom…</option>
+                  </select>
+                </label>
+                <label class="setting-row">
+                  <span>Command</span>
+                  <input id="editor-template" type="text" placeholder="e.g. zed --add {file}:{line}" />
+                </label>
+                <div class="setting-hint">
+                  <code>{file}</code> = source file path,  <code>{line}</code> = line number
+                </div>
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <h3>Outline Panel</h3>
+              <div class="settings-group">
+                <label class="setting-row">
+                  <input type="checkbox" id="out-show-scenes" checked>
+                  <span>Show Scenes</span>
+                </label>
+                <label class="setting-row">
+                  <input type="checkbox" id="out-show-sections" checked>
+                  <span>Show Sections</span>
+                </label>
+                <label class="setting-row">
+                  <input type="checkbox" id="out-show-dialogue" checked>
+                  <span>Show Characters</span>
+                </label>
+                <label class="setting-row">
+                  <input type="checkbox" id="out-show-synopses" checked>
+                  <span>Show Synopses</span>
+                </label>
+                <label class="setting-row">
+                  <input type="checkbox" id="out-show-notes" checked>
+                  <span>Show Notes</span>
+                </label>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

@@ -27,4 +27,6 @@ serde_json = "1"
 betterfountain_rust = { git = "https://github.com/ArmingLou/betterfountain-rust.git" }
 notify = "6"
 tokio = { version = "1", features = ["full"] }
+printpdf = "0.7"
+base64 = "0.22"
 

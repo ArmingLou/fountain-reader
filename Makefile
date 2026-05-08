@@ -11,7 +11,11 @@ all: build
 
 # —— 开发 ——
 dev:
-	npm run tauri dev
+	@echo "启动 Vite dev 服务器..."
+	@npm run dev & \
+	sleep 3 && \
+	echo "启动 Tauri..." && \
+	cargo run --manifest-path $(SRC_TAURI)/Cargo.toml
 
 # —— 构建 ——
 frontend:
@@ -19,6 +23,9 @@ frontend:
 
 backend:
 	cargo build --manifest-path $(SRC_TAURI)/Cargo.toml
+
+backend-release:
+	cargo build --release --manifest-path $(SRC_TAURI)/Cargo.toml
 
 build: frontend backend
 	@echo "✅ Build complete: $(DEBUG_BIN)"
@@ -28,11 +35,11 @@ check:
 	npx tsc --noEmit
 
 release: frontend
-	cargo build --release --manifest-path $(SRC_TAURI)/Cargo.toml
+	npm run tauri build -- --no-bundle
 	@echo "✅ Release build: $(RELEASE_BIN)"
 
 # —— 打包 ——
-package: release
+package: frontend
 	npm run tauri build
 
 # —— 清理 ——

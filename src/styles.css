@@ -6,6 +6,19 @@
   color: #0f0f0f;
   background: #f6f6f6;
   -webkit-font-smoothing: antialiased;
+  
+  --scenecolor-dawn: rgba(166, 83, 0, 0.709);
+  --scenecolor-day: rgb(250, 87, 23);
+  --scenecolor-dusk: rgba(175, 33, 159, 0.748);
+  --scenecolor-night: rgb(85, 78, 208);
+  --scenecolor-evening: var(--scenecolor-dusk);
+  --scenecolor-morning: rgb(228, 162, 91);
+  --scenecolor-int: rgb(182, 0, 0);
+  --scenecolor-ext: rgb(57, 185, 72);
+  --scenecolor-multiple: rgb(173, 184, 16);
+  --scenecolor-int-ext: rgb(16, 134, 184);
+  --scenecolor-other: black;
+  --scenecolor-unknown: black;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -68,21 +81,63 @@ body { overflow: hidden; height: 100vh; }
 .stats-nav li:hover { background: #e8e8e8; }
 .stats-nav li.active { background: #dce4f5; color: #1a3a6b; font-weight: 600; }
 
-.stats-main { flex: 1; overflow: auto; padding: 16px 24px; }
+.stats-main { flex: 1; overflow: hidden; padding: 16px 24px; }
 .stats-group { display: none; }
-.stats-group.active { display: block; }
+.stats-group.active { display: flex; flex-direction: column; height: 100%; }
+.stats-group[data-group="overview"].active { display: block; }
+.stats-group h1, .stats-group h2, .stats-group h3,
+.stats-group .flexgroup, .stats-group .summary, 
+.stats-group .chart { flex-shrink: 0; position: relative; }
+.table-scroll { flex: 1; overflow-y: auto; min-height: 0; margin-top: 12px; }
+.data-table th { padding: 8px 16px; cursor: pointer; user-select: none; white-space: nowrap; }
+.data-table td { padding: 6px 16px; }
+.flexgroup { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-bottom: 12px; }
+.flexitem { display: flex; align-items: center; gap: 8px; }
+.flexitem .desc { font-size: 12px; color: #888; white-space: nowrap; }
+.flexitem .num { font-size: 20px; font-weight: 500; color: #333; white-space: nowrap; }
+.flexitem.minor .num { font-size: 15px; }
 
-h1 { font-size: 15px; font-weight: 600; margin: 20px 0 10px; color: #222; }
-h1:first-child { margin-top: 0; }
+/* ====== 表格角色圆点 ====== */
+.char-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
 
-.flexgroup { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 12px; }
-.flexitem .desc { font-size: 11px; color: #888; }
-.flexitem .num { font-size: 22px; font-weight: 600; color: #333; }
+/* ====== 表格行 hover 高亮 ====== */
+.data-table tbody tr {
+  cursor: default;
+  transition: background 0.15s;
+}
+.data-table tbody tr:hover {
+  background: rgba(57, 108, 216, 0.08);
+}
 
-.chart { width: 100%; margin: 8px 0; background: #fafafa; border: 1px solid #eee; border-radius: 4px; }
-.data-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
-.data-table th, .data-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #eee; }
-.data-table th { background: #f5f5f5; font-weight: 600; }
+.chart-data-barcode[data-y='int']{ fill: var(--scenecolor-int) }
+.chart-data-barcode[data-y='ext']{ fill: var(--scenecolor-ext) }
+.chart-data-barcode[data-y='ie']{ fill: var(--scenecolor-int-ext) }
+.chart-data-barcode[data-y='multiple']{ fill: var(--scenecolor-multiple) }
+.chart-data-barcode[data-y='unknown']{ fill: var(--scenecolor-unknown) }
+.chart-data-barcode[data-y='morning']{ fill: var(--scenecolor-morning) }
+.chart-data-barcode[data-y='dawn']{ fill: var(--scenecolor-dawn) }
+.chart-data-barcode[data-y='day']{ fill: var(--scenecolor-day) }
+.chart-data-barcode[data-y='evening']{ fill: var(--scenecolor-evening) }
+.chart-data-barcode[data-y='dusk']{ fill: var(--scenecolor-dusk) }
+.chart-data-barcode[data-y='night']{ fill: var(--scenecolor-night) }
+
+.chart-container{
+  fill: transparent;
+}
+.chart text, .chart svg text {
+  fill: #ccc;
+}
+
+.mouse-line{
+  fill: var(--vscode-panel-border, #ddd);
+}
 
 /* ====== 大纲面板 ====== */
 .outline-toolbar {
@@ -242,9 +297,14 @@ input[type="range"] { height: 4px; margin: 0 4px; }
   .stats-nav li.active { background: #1a3a5c; color: #8ab4f8; }
   h1 { color: #ddd; }
   .flexitem .num { color: #eee; }
-  .chart { background: #2a2a2a; border-color: #444; }
-  .data-table th { background: #333; }
-  .data-table td { border-color: #444; }
+  .chart { background: transparent; border: none; }
+  .chart rect { color: #ddd; }
+  .stats-group h3, .stats-group th, .stats-group td { color: #ddd; }
+  .flexitem .desc { color: #999; }
+  .flexitem .num { color: #eee; }
+  #dur-summary, #scene-summary { color: #ccc; }
+  .data-table th { background: #333; color: #ddd; }
+  .data-table td { border-color: #444; color: #ccc; }
   .outline-toolbar { background: #2a2a2a; border-color: #444; }
   .outline-row:hover { background: #333; }
 .outline-jump-btn:hover { background: #2a4180; color: #8ab4f8; border-color: #5a9cff; }
@@ -285,4 +345,55 @@ input[type="range"] { height: 4px; margin: 0 4px; }
   .modal-header h2 { color: #ddd; }
   .modal-close { color: #888; }
   .modal-close:hover { color: #fff; }
+}
+
+/* ====== 场景统计紧凑 ====== */
+.stats-group[data-group="scenes"] .flexgroup { margin-bottom: 4px; }
+.stats-group[data-group="scenes"] .summary { margin-top: 4px; }
+.stats-group[data-group="scenes"] h2 { margin-top: 8px; }
+.stats-group[data-group="scenes"] .chart { height: 90px; }
+
+/* ====== 图表工具提示 ====== */
+.chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  z-index: 100;
+  background: #fff;
+  color: #333;
+  padding: 6px 10px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+  transition: opacity 0.1s ease;
+}
+.chart-tooltip-time {
+  font-weight: 600;
+  color: #555;
+}
+.chart-tooltip-scene {
+  font-weight: 600;
+  color: #222;
+}
+.chart-tooltip-type {
+  color: #777;
+  font-size: 11px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .chart-tooltip {
+    background: #333;
+    color: #ddd;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+  .chart-tooltip-time {
+    color: #bbb;
+  }
+  .chart-tooltip-scene {
+    color: #eee;
+  }
+  .chart-tooltip-type {
+    color: #999;
+  }
 }

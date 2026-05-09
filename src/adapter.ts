@@ -58,6 +58,7 @@ export interface AdaptedParseOutput {
   lengthAction: number;
   lenWords?: number;
   lenChars?: number;
+  statistics?: any;
 }
 
 /**
@@ -105,7 +106,8 @@ export function adaptParseOutput(rustOutput: any): AdaptedParseOutput {
     lengthDialogue: rustOutput.length_dialogue || rustOutput.lengthDialogue || 0,
     lengthAction: rustOutput.length_action || rustOutput.lengthAction || 0,
     lenWords: totalWords,
-    lenChars: totalChars
+    lenChars: totalChars,
+    statistics: convertStatistics(rustOutput.statistics)
   };
 }
 
@@ -121,7 +123,7 @@ function adaptToken(t: any): AdaptedToken {
     number: t.number,
     dual: t.dual,
     level: t.level,
-    time: t.duration_sec || t.time,
+    time: t.time || t.duration_sec || 0,
     character: t.character,
     charactersAction: t.characters_action || t.charactersAction,
     playTimeSec: t.play_time_sec || t.playTimeSec || 0,
@@ -171,5 +173,115 @@ function adaptProperties(props: any): AdaptedProperties {
     characterSceneNumber,
     firstSceneLine: props.firstSceneLine || props.first_scene_line || -1,
     structure: props.structure || []
+  };
+}
+
+function convertStatistics(snakeStats: any): any {
+  if (!snakeStats) return undefined;
+  
+  const convertCharacterStat = (cs: any) => ({
+    name: cs.name,
+    speakingParts: cs.speaking_parts,
+    wordsSpoken: cs.words_spoken,
+    secondsSpoken: cs.seconds_spoken,
+    secondsTotal: cs.seconds_total,
+    averageComplexity: cs.average_complexity,
+    monologues: cs.monologues,
+    numberOfScenes: cs.number_of_scenes,
+    color: cs.color,
+  });
+  
+  const convertCharacterStats = (cs: any) => {
+    if (!cs) return undefined;
+    return {
+      characters: (cs.characters || []).map(convertCharacterStat),
+      complexity: cs.complexity,
+      characterCount: cs.character_count,
+      monologues: cs.monologues,
+    };
+  };
+  
+  const convertLocationStat = (ls: any) => ({
+    name: ls.name,
+    sceneNumbers: ls.scene_numbers,
+    sceneLines: ls.scene_lines,
+    numberOfScenes: ls.number_of_scenes,
+    timesOfDay: ls.times_of_day,
+    interiorExterior: ls.interior_exterior,
+    color: ls.color,
+  });
+  
+  const convertLocationStats = (ls: any) => {
+    if (!ls) return undefined;
+    return {
+      locations: (ls.locations || []).map(convertLocationStat),
+      locationsCount: ls.locations_count,
+    };
+  };
+  
+  const convertSceneStat = (ss: any) => ({
+    title: ss.title,
+  });
+  
+  const convertSceneStats = (ss: any) => {
+    if (!ss) return undefined;
+    return {
+      scenes: (ss.scenes || []).map(convertSceneStat),
+    };
+  };
+  
+  const convertLengthChartItem = (item: any) => ({
+    line: item.line,
+    playTimeSec: item.play_time_sec,
+    scene: item.scene,
+    length: item.length,
+  });
+  
+  const convertSceneItem = (item: any) => ({
+    line: item.line,
+    endline: item.endline,
+    scene: item.scene,
+    type: item.type,
+    time: item.time,
+  });
+  
+  const convertDurationByProp = (dp: any) => ({
+    prop: dp.prop,
+    duration: dp.duration,
+  });
+  
+  const convertDurationStats = (ds: any) => {
+    if (!ds) return undefined;
+    return {
+      dialogue: ds.dialogue,
+      action: ds.action,
+      total: ds.total,
+      lengthchart_action: (ds.lengthchart_action || []).map(convertLengthChartItem),
+      lengthchart_dialogue: (ds.lengthchart_dialogue || []).map(convertLengthChartItem),
+      durationBySceneProp: (ds.duration_by_scene_prop || []).map(convertDurationByProp),
+      scenes: (ds.scenes || []).map(convertSceneItem),
+      monologues: ds.monologues,
+      characters: (ds.characters || []).map((timeline: any[]) =>
+        (timeline || []).map((item: any) => ({
+          line: item.line,
+          playTimeSec: item.play_time_sec,
+          scene: item.scene,
+          lengthTimeGlobal: item.length_time_global,
+          lengthWordsGlobal: item.length_words_global,
+          monologue: item.monologue,
+          lengthTime: item.length_time,
+          lengthWords: item.length_words,
+          cumulativeTime: item.length_time_global,
+        }))
+      ),
+      characternames: ds.characternames || [],
+    };
+  };
+  
+  return {
+    characterStats: convertCharacterStats(snakeStats.character_stats),
+    sceneStats: convertSceneStats(snakeStats.scene_stats),
+    locationStats: convertLocationStats(snakeStats.location_stats),
+    durationStats: convertDurationStats(snakeStats.duration_stats),
   };
 }

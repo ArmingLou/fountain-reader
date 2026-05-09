@@ -26,10 +26,10 @@
 
       <!-- Tab 导航栏 -->
       <nav class="tab-nav">
-        <button class="tab-btn active" data-tab="pdf-preview">📄 PDF 预览</button>
-        <button class="tab-btn" data-tab="docx-preview">📝 DOCX 预览</button>
-        <button class="tab-btn" data-tab="statistics">📊 统计</button>
+        <button class="tab-btn active" data-tab="statistics">📊 统计</button>
         <button class="tab-btn" data-tab="outline">📑 大纲</button>
+        <button class="tab-btn" data-tab="pdf-preview">📄 PDF 预览</button>
+        <button class="tab-btn" data-tab="docx-preview">📝 DOCX 预览</button>
       </nav>
 
       <!-- 主内容区域 -->
@@ -38,8 +38,86 @@
           <span id="file-name">未加载文件</span>
         </div>
 
+        <!-- 统计面板 -->
+        <div id="statistics-panel" class="tab-panel active">
+          <div class="stats-layout">
+            <aside class="stats-nav">
+              <!-- <div class="stats-nav-title">📊 统计面板</div> -->
+              <ul>
+                <li data-group="overview" class="active">⭐ 概览</li>
+                <li data-group="characters">👥 角色</li>
+                <li data-group="scenes">🎬 场景</li>
+              </ul>
+            </aside>
+            <div class="stats-main">
+              <div data-group="overview" class="stats-group active">
+                <h1>📏 篇幅统计</h1>
+                <div class="flexgroup">
+                  <div class="flexitem"><div class="desc">页数</div><div class="num" id="len-pages">0</div></div>
+                  <div class="flexitem"><div class="desc">场景</div><div class="num" id="len-scenes">0</div></div>
+                  <div class="flexitem"><div class="desc">词数</div><div class="num" id="len-words">0</div></div>
+                  <div class="flexitem"><div class="desc">字符</div><div class="num" id="len-chars">0</div></div>
+                </div>
+                <h1>⏱️ 时长预估</h1>
+                <div class="flexgroup">
+                  <div class="flexitem"><div class="desc">总计</div><div class="num" id="dur-total" style="font-weight: 600;">0:00</div></div>
+                  <div class="flexitem minor"><div class="desc">动作</div><div class="num" id="dur-action" style="color: var(--vscode-symbolIcon-constructorForeground, #4a90d9);">0:00</div></div>
+                  <div class="flexitem minor"><div class="desc">对白</div><div class="num" id="dur-dialogue" style="color: var(--vscode-symbolIcon-fieldForeground, #e67e22);">0:00</div></div>
+                </div>
+                <div id="dur-summary" class="summary" style="margin-top: 8px; opacity: 0.75;"></div>
+                <div id="dur-chart" class="chart" style="height:200px; margin-top: 12px;"></div>
+              </div>
+              <div data-group="characters" class="stats-group">
+                <h1>👥 角色统计</h1>
+                <div class="flexgroup">
+                  <div class="flexitem"><div class="desc">角色数</div><div class="num" id="char-count">0</div></div>
+                  <div class="flexitem"><div class="desc">独白数</div><div class="num" id="char-monologues">0</div></div>
+                </div>
+                <div id="char-chart" class="chart" style="height:256px"></div>
+                <div class="table-scroll"><table id="char-table" class="data-table"></table></div>
+              </div>
+              <div data-group="scenes" class="stats-group">
+                <h1>🎬 场景统计</h1>
+                <div class="flexgroup">
+                  <div class="flexitem"><div class="desc">场数</div><div class="num" id="scene-count">0</div></div>
+                  <div class="flexitem"><div class="desc">地点数</div><div class="num" id="loc-count">0</div></div>
+                </div>
+                <h2 style="font-size:13px;margin-top:8px;color:#666">内外景分布</h2>
+                <div class="flexgroup" style="margin-top:2px">
+                  <div class="flexitem minor"><div class="desc">内景</div><div class="num" id="scene-int" style="color: var(--scenecolor-int, #b60000);">0</div></div>
+                  <div class="flexitem minor"><div class="desc">外景</div><div class="num" id="scene-ext" style="color: var(--scenecolor-ext, #39b948);">0</div></div>
+                  <div class="flexitem minor"><div class="desc">内外景</div><div class="num" id="scene-ie" style="color: var(--scenecolor-int-ext, #1086b8);">0</div></div>
+                  <div class="flexitem minor"><div class="desc">混合</div><div class="num" id="scene-multiple" style="color: var(--scenecolor-multiple, #adb810);">0</div></div>
+                </div>
+                <h2 style="font-size:13px;margin-top:8px;color:#666">时间分布</h2>
+                <div class="flexgroup" style="margin-top:2px">
+                  <div class="flexitem minor"><div class="desc">黎明</div><div class="num" id="scene-dawn" style="color: var(--scenecolor-dawn, #a65300);">0</div></div>
+                  <div class="flexitem minor"><div class="desc">早晨</div><div class="num" id="scene-morning" style="color: var(--scenecolor-morning, #e4a25b);">0</div></div>
+                  <div class="flexitem minor"><div class="desc">白天</div><div class="num" id="scene-day" style="color: var(--scenecolor-day, #fa5717);">0</div></div>
+                  <div class="flexitem minor"><div class="desc">黄昏</div><div class="num" id="scene-dusk" style="color: var(--scenecolor-dusk, #af219f);">0</div></div>
+                  <div class="flexitem minor"><div class="desc">夜晚</div><div class="num" id="scene-night" style="color: var(--scenecolor-night, #554ed0);">0</div></div>
+                </div>
+                <div id="scene-summary" class="summary" style="margin-top:2px;opacity:0.75"></div>
+                <div id="scene-chart" class="chart" style="height:90px"></div>
+                <div class="table-scroll"><table id="loc-table" class="data-table"></table></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 大纲面板 -->
+        <div id="outline-panel" class="tab-panel">
+          <div class="outline-toolbar">
+            <button id="outline-expand-all" class="toolbar-btn-small" title="全部展开">⊞</button>
+            <button id="outline-collapse-all" class="toolbar-btn-small" title="全部折叠">⊟</button>
+          </div>
+          <div id="outline-tree" class="outline-tree">
+            <p class="placeholder">打开 Fountain 文件以查看大纲</p>
+          </div>
+        </div>
+
         <!-- PDF 预览面板 -->
-        <div id="pdf-preview-panel" class="tab-panel active">
+        <div id="pdf-preview-panel" class="tab-panel">
           <div class="panel-toolbar">
             <button id="pdf-prev-page" class="toolbar-btn-small" title="上一页">◀</button>
             <span id="pdf-page-info">1 / 1</span>
@@ -74,67 +152,6 @@
               <span>正在生成预览...</span>
             </div>
             <p class="placeholder">打开 Fountain 文件以预览 DOCX</p>
-          </div>
-        </div>
-
-        <!-- 统计面板 -->
-        <div id="statistics-panel" class="tab-panel">
-          <div class="stats-layout">
-            <aside class="stats-nav">
-              <!-- <div class="stats-nav-title">📊 统计面板</div> -->
-              <ul>
-                <li data-group="overview" class="active">⭐ 概览</li>
-                <li data-group="characters">👥 角色</li>
-                <li data-group="scenes">🎬 场景</li>
-              </ul>
-            </aside>
-            <div class="stats-main">
-              <div data-group="overview" class="stats-group active">
-                <h1>📏 篇幅统计</h1>
-                <div class="flexgroup">
-                  <div class="flexitem"><div class="desc">页数</div><div class="num" id="len-pages">0</div></div>
-                  <div class="flexitem"><div class="desc">场景</div><div class="num" id="len-scenes">0</div></div>
-                  <div class="flexitem"><div class="desc">词数</div><div class="num" id="len-words">0</div></div>
-                  <div class="flexitem"><div class="desc">字符</div><div class="num" id="len-chars">0</div></div>
-                </div>
-                <h1>⏱️ 时长预估</h1>
-                <div class="flexgroup">
-                  <div class="flexitem"><div class="desc">总计</div><div class="num" id="dur-total">0:00</div></div>
-                  <div class="flexitem"><div class="desc">动作</div><div class="num" id="dur-action">0:00</div></div>
-                  <div class="flexitem"><div class="desc">对话</div><div class="num" id="dur-dialogue">0:00</div></div>
-                </div>
-                <div id="dur-chart" class="chart" style="height:200px"></div>
-              </div>
-              <div data-group="characters" class="stats-group">
-                <h1>👥 角色统计</h1>
-                <div class="flexgroup">
-                  <div class="flexitem"><div class="desc">角色数</div><div class="num" id="char-count">0</div></div>
-                  <div class="flexitem"><div class="desc">独白数</div><div class="num" id="char-monologues">0</div></div>
-                </div>
-                <div id="char-chart" class="chart" style="height:256px"></div>
-                <table id="char-table" class="data-table"></table>
-              </div>
-              <div data-group="scenes" class="stats-group">
-                <h1>🎬 场景统计</h1>
-                <div class="flexgroup">
-                  <div class="flexitem"><div class="desc">场数</div><div class="num" id="scene-count">0</div></div>
-                  <div class="flexitem"><div class="desc">地点数</div><div class="num" id="loc-count">0</div></div>
-                </div>
-                <div id="scene-chart" class="chart" style="height:180px"></div>
-                <table id="loc-table" class="data-table"></table>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 大纲面板 -->
-        <div id="outline-panel" class="tab-panel">
-          <div class="outline-toolbar">
-            <button id="outline-expand-all" class="toolbar-btn-small" title="全部展开">⊞</button>
-            <button id="outline-collapse-all" class="toolbar-btn-small" title="全部折叠">⊟</button>
-          </div>
-          <div id="outline-tree" class="outline-tree">
-            <p class="placeholder">打开 Fountain 文件以查看大纲</p>
           </div>
         </div>
       </main>
@@ -194,6 +211,23 @@
                 <input type="checkbox" id="out-show-notes" checked>
                 <span>显示备注</span>
               </label>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <h3>自动刷新</h3>
+            <div class="settings-group">
+              <label class="setting-row">
+                <input type="checkbox" id="auto-refresh-enabled" checked>
+                <span>启用自动刷新</span>
+              </label>
+              <label class="setting-row">
+                <span>刷新频率限制（秒）</span>
+                <input id="auto-refresh-interval" type="number" min="0.5" max="10" step="0.5" value="1" style="width: 80px;">
+              </label>
+              <div class="setting-hint">
+                文件保存后自动刷新面板，限制刷新频率防止性能问题
+              </div>
             </div>
           </section>
         </div>

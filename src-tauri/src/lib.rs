@@ -15,6 +15,7 @@ const SINGLE_INSTANCE_PORT: u16 = 16658;
 
 struct AppState {
     watched_file: Mutex<Option<PathBuf>>,
+    stop_watcher: Mutex<Option<std::sync::mpsc::Sender<()>>>,
 }
 
 #[tauri::command]
@@ -26,7 +27,7 @@ fn greet(name: &str) -> String {
 fn parse_fountain(text: String) -> String {
     use betterfountain_rust::{FountainParser, Conf};
     let mut parser = FountainParser::new();
-    let result = parser.parse(&text, &Conf::default(), false);
+    let result = parser.parse(&text, &Conf::default(), false, Some(true));
     serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())
 }
 
@@ -40,28 +41,59 @@ fn watch_file(app: tauri::AppHandle, path: String) -> Result<(), String> {
     let state = app.state::<AppState>();
     let file_path = PathBuf::from(&path);
 
+    // 停止旧的监听器
+    if let Some(stop_sender) = state.stop_watcher.lock().unwrap().take() {
+        let _ = stop_sender.send(());
+    }
+
     *state.watched_file.lock().unwrap() = None;
 
     let app_handle = app.clone();
     let watch_path = file_path.clone();
 
+    // 创建停止通道
+    let (stop_tx, stop_rx) = std::sync::mpsc::channel();
+    *state.stop_watcher.lock().unwrap() = Some(stop_tx);
+
     std::thread::spawn(move || {
         let (tx, rx) = std::sync::mpsc::channel();
-        let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
+        let mut watcher = match notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
             if let Ok(event) = res {
                 if matches!(event.kind, EventKind::Modify(_)) {
                     let _ = tx.send(());
                 }
             }
-        }).unwrap();
+        }) {
+            Ok(w) => w,
+            Err(_) => return,
+        };
 
-        watcher.watch(&watch_path, RecursiveMode::NonRecursive).unwrap();
+        if watcher.watch(&watch_path, RecursiveMode::NonRecursive).is_err() {
+            return;
+        }
 
         loop {
-            if rx.recv().is_err() {
-                break;
+            // 使用 select 来检查是否需要停止
+            use std::sync::mpsc::TryRecvError;
+            
+            // 检查停止信号
+            match stop_rx.try_recv() {
+                Ok(_) => break,  // 收到停止信号
+                Err(TryRecvError::Empty) => {},  // 继续运行
+                Err(TryRecvError::Disconnected) => break,  // 通道关闭
             }
-            let _ = app_handle.emit("file-changed", &path);
+            
+            // 检查文件变化（非阻塞）
+            match rx.try_recv() {
+                Ok(_) => {
+                    let _ = app_handle.emit("file-changed", &path);
+                }
+                Err(TryRecvError::Empty) => {
+                    // 短暂休眠避免 CPU 占用过高
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+                Err(TryRecvError::Disconnected) => break,
+            }
         }
     });
 
@@ -72,6 +104,12 @@ fn watch_file(app: tauri::AppHandle, path: String) -> Result<(), String> {
 #[tauri::command]
 fn unwatch_file(app: tauri::AppHandle) -> Result<(), String> {
     let state = app.state::<AppState>();
+    
+    // 发送停止信号
+    if let Some(stop_sender) = state.stop_watcher.lock().unwrap().take() {
+        let _ = stop_sender.send(());
+    }
+    
     *state.watched_file.lock().unwrap() = None;
     Ok(())
 }
@@ -80,7 +118,7 @@ fn unwatch_file(app: tauri::AppHandle) -> Result<(), String> {
 async fn export_docx(text: String, output_path: String) -> Result<String, String> {
     let conf = fountain::Conf::default();
     let mut parser = fountain::FountainParser::new();
-    let parsed = parser.parse(&text, &conf, false);
+    let parsed = parser.parse(&text, &conf, false, None);
     
     match generate_docx_document(&output_path, &conf, &parsed).await {
         Ok(_) => Ok("DOCX exported successfully".to_string()),
@@ -93,7 +131,7 @@ async fn export_docx_base64(text: String) -> Result<String, String> {
     use betterfountain_rust::{FountainParser, Conf};
     use betterfountain_rust::docx::generate_docx_document;
     let mut parser = FountainParser::new();
-    let parsed = parser.parse(&text, &Conf::default(), false);
+    let parsed = parser.parse(&text, &Conf::default(), false, None);
     
     let temp_path = std::env::temp_dir().join("fountain_preview.docx");
     let temp_path_str = temp_path.to_string_lossy().to_string();
@@ -118,7 +156,7 @@ async fn export_docx_base64(text: String) -> Result<String, String> {
 async fn export_pdf(text: String, output_path: String) -> Result<String, String> {
     let conf = fountain::Conf::default();
     let mut parser = fountain::FountainParser::new();
-    let parsed = parser.parse(&text, &conf, false);
+    let parsed = parser.parse(&text, &conf, false, None);
     
     let (doc, page1, layer1) = PdfDocument::new(
         "Fountain Script",
@@ -187,7 +225,7 @@ async fn export_pdf(text: String, output_path: String) -> Result<String, String>
 async fn export_pdf_base64(text: String) -> Result<String, String> {
     let conf = fountain::Conf::default();
     let mut parser = fountain::FountainParser::new();
-    let parsed = parser.parse(&text, &conf, false);
+    let parsed = parser.parse(&text, &conf, false, None);
     
     let (doc, page1, layer1) = PdfDocument::new(
         "Fountain Script",
@@ -256,6 +294,7 @@ async fn export_pdf_base64(text: String) -> Result<String, String> {
 
 #[tauri::command]
 async fn open_in_editor(app: tauri::AppHandle, file_path: String, line: u32, editor: Option<String>, template: Option<String>) -> Result<String, String> {
+    let line = line + 1; // 转换为 1-based 行号
     let cmd = if let Some(tmpl) = template.filter(|t| !t.is_empty()) {
         tmpl.replace("{file}", &file_path).replace("{line}", &line.to_string())
     } else {
@@ -294,6 +333,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(AppState {
             watched_file: Mutex::new(None),
+            stop_watcher: Mutex::new(None),
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())

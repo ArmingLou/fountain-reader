@@ -284,7 +284,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 [[package]]
 name = "betterfountain_rust"
 version = "0.1.0"
-source = "git+https://github.com/ArmingLou/betterfountain-rust.git#8720ea8c1522024451bbb19f51db800c4741d57e"
+source = "git+https://github.com/ArmingLou/betterfountain-rust.git#9c7fd68909284a35bd543f1ab06f0509e4bd18b5"
 dependencies = [
  "base64 0.13.1",
  "chrono",

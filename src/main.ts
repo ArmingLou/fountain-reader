@@ -570,6 +570,7 @@ function buildOutlineTree() {
     container.innerHTML = '<p class="placeholder">打开 Fountain 文件以查看大纲</p>';
     return;
   }
+  console.log("buildOutlineTree: 结构数量", parsedData.properties.structure.length);
 
   const structure = parsedData.properties.structure;
   
@@ -915,10 +916,10 @@ function createSynopsisElement(syn: any, depth: number): HTMLElement {
     jumpBtn.className = "outline-jump-btn";
     jumpBtn.textContent = "↗";
     jumpBtn.title = `跳转到第 ${syn.line} 行`;
-    jumpBtn.addEventListener("click", (e) => {
+    jumpBtn.onclick = (e) => {
       e.stopPropagation();
       jumpToLine(syn.line);
-    });
+    };
     synRow.appendChild(jumpBtn);
   }
   
@@ -971,15 +972,22 @@ function getEditorName(): string {
 let cliTempEditor: string | null = null;
 
 async function jumpToLine(lineNum: number) {
-  if (!currentFilePath) return;
-  const name = cliTempEditor || getEditorName();
-  const template = getEditorTemplate();
-  await invoke("open_in_editor", {
-    filePath: currentFilePath,
-    line: lineNum,
-    editor: name,
-    template: template,
-  }).catch(() => {});
+  if (!currentFilePath) { console.warn("跳转失败: 未打开文件"); return; }
+  const name = (cliTempEditor && cliTempEditor !== "null") ? cliTempEditor : (getEditorName() || "zed");
+  const template = (cliTempEditor && cliTempEditor !== "null") ? "" : (getEditorTemplate() || "zed --add {file}:{line}");
+  console.log(`跳转至 ${currentFilePath}:${lineNum}, 编辑器: ${name}, 模板: ${template}`);
+  try {
+    const result = await invoke<string>("open_in_editor", {
+      filePath: currentFilePath,
+      line: lineNum,
+      editor: name,
+      template: template,
+    });
+    console.log("跳转成功:", result);
+  } catch (e) {
+    console.error("跳转失败:", e);
+    alert(`跳转失败: ${e}\n编辑器: ${name}\n请确认 ${name === "zed" ? "Zed" : name} 已安装且在 PATH 中`);
+  }
 }
 (window as any).jumpToLine = jumpToLine;
 
@@ -1436,6 +1444,21 @@ document.getElementById("settings-modal")?.addEventListener("click", (e) => {
 
   listen<string>("cli-editor", (event) => {
     cliTempEditor = event.payload;
+  });
+
+  listen<string>("cli-file", (event) => {
+    currentFilePath = event.payload;
+    loadAndWatch(currentFilePath);
+  });
+
+  // 主动查询 CLI 参数（兜底事件可能丢失的情况）
+  invoke<{ editor: string | null; source: string | null }>("get_cli_args").then((args) => {
+    console.warn("🔍 CLI参数:", JSON.stringify(args), "editor类型:", typeof args.editor, "值:", args.editor);
+    if (args.editor) { console.log("设置临时编辑器:", args.editor); cliTempEditor = args.editor; }
+    if (args.source && !currentFilePath) {
+      currentFilePath = args.source;
+      loadAndWatch(currentFilePath);
+    }
   });
 
   // 图表自适应：窗口 resize 时重绘

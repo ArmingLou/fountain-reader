@@ -319,6 +319,26 @@ async fn open_in_editor(app: tauri::AppHandle, file_path: String, line: u32, edi
     }
 }
 
+#[tauri::command]
+fn get_cli_args() -> serde_json::Value {
+    let args: Vec<String> = std::env::args().collect();
+    let mut editor: Option<String> = None;
+    let mut source: Option<String> = None;
+    let mut i = 1;
+    while i < args.len() {
+        if args[i] == "-e" || args[i] == "--editor" {
+            if i + 1 < args.len() {
+                editor = Some(args[i + 1].clone());
+                i += 1;
+            }
+        } else if !args[i].starts_with('-') {
+            source = Some(args[i].clone());
+        }
+        i += 1;
+    }
+    serde_json::json!({ "editor": editor, "source": source })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let cli_args = std::env::args().collect::<Vec<_>>();
@@ -341,7 +361,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![greet, parse_fountain, read_file, export_docx, export_docx_base64, export_pdf, export_pdf_base64, watch_file, unwatch_file, open_in_editor])
+        .invoke_handler(tauri::generate_handler![greet, parse_fountain, read_file, export_docx, export_docx_base64, export_pdf, export_pdf_base64, watch_file, unwatch_file, open_in_editor, get_cli_args])
         .setup(|app| {
             let handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -350,6 +370,13 @@ pub fn run() {
                     if let Ok(mut s) = stream {
                         let mut buf = String::new();
                         if s.read_to_string(&mut buf).is_ok() {
+                            // 提取文件路径（第一个参数）
+                            let parts: Vec<&str> = buf.split_whitespace().collect();
+                            if let Some(file) = parts.get(1) {
+                                if !file.starts_with('-') {
+                                    let _ = handle.emit("cli-file", file.to_string());
+                                }
+                            }
                             let editor = buf.split_whitespace()
                                 .skip_while(|a| *a != "-e" && *a != "--editor")
                                 .nth(1)
@@ -357,16 +384,42 @@ pub fn run() {
                             if let Some(ed) = editor {
                                 let _ = handle.emit("cli-editor", ed);
                             }
+                            // 激活窗口到最前面
+                            if let Some(window) = handle.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
                         }
                     }
                 }
             });
 
             if let Ok(cli) = app.cli().matches() {
+                if let Some(source) = cli.args.get("source") {
+                    let path = source.value.to_string();
+                    let _ = app.handle().emit("cli-file", path);
+                }
                 if let Some(editor) = cli.args.get("editor") {
                     let ed = editor.value.to_string();
                     let _ = app.handle().emit("cli-editor", ed);
                 }
+            }
+
+            // WebView 就绪后重发 CLI 事件，确保前端能收到
+            let h = app.handle().clone();
+            if let Ok(cli) = app.cli().matches() {
+                let source = cli.args.get("source").map(|s| s.value.to_string());
+                let editor = cli.args.get("editor").map(|s| s.value.to_string());
+                let h2 = h.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+                    if let Some(ref path) = source {
+                        let _ = h2.emit("cli-file", path);
+                    }
+                    if let Some(ref ed) = editor {
+                        let _ = h2.emit("cli-editor", ed);
+                    }
+                });
             }
             Ok(())
         })

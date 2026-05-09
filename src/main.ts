@@ -5,6 +5,7 @@ import { renderAsync } from "docx-preview";
 import * as pdfjsLib from "pdfjs-dist";
 import { adaptParseOutput } from "./adapter";
 import { createStatistics } from "./statistics";
+import { renderDurationChart, renderCharacterChart, renderSceneChart } from "./charts";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -85,6 +86,10 @@ function updateStatsOverview() {
   setText("scene-count", sceneStats.scenes.length.toString());
   setText("loc-count", locationStats.locationsCount.toString());
   setText("file-name", currentFilePath?.split("/").pop() || "No file loaded");
+
+  renderDurationChart("#dur-chart", durationStats.lengthchart_action);
+  renderCharacterChart("#char-chart", characterStats.characters);
+  renderSceneChart("#scene-chart", sceneStats.scenes, locationStats.locations);
 }
 
 function fmtDuration(sec: number) {

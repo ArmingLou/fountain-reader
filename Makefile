@@ -11,11 +11,7 @@ all: build
 
 # —— 开发 ——
 dev:
-	@echo "启动 Vite dev 服务器..."
-	@npm run dev & \
-	sleep 3 && \
-	echo "启动 Tauri..." && \
-	cargo run --manifest-path $(SRC_TAURI)/Cargo.toml
+	npm run tauri dev
 
 # —— 构建 ——
 frontend:

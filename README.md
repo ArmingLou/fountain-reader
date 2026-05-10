@@ -183,8 +183,8 @@ fountain-reader ./script.fountain -e code
 # 方式 1 — 直接调二进制（推荐给脚本/编辑器集成）
 /Applications/Fountain\ Reader.app/Contents/MacOS/fountain-reader ./script.fountain -e zed
 
-# 方式 2 — 用 open 命令传参
-open -a "Fountain Reader" --args ./script.fountain -e zed
+# 方式 2 — 用 open 命令传参 （不兼容 open 传参）
+# open -a "Fountain Reader" --args ./script.fountain -e zed 
 
 # 方式 3 — 建 alias（最方便）
 echo 'alias fr="/Applications/Fountain\ Reader.app/Contents/MacOS/fountain-reader"' >> ~/.zshrc

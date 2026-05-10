@@ -223,9 +223,12 @@ async fn export_pdf(text: String, output_path: String) -> Result<String, String>
 
 #[tauri::command]
 async fn export_pdf_base64(text: String) -> Result<String, String> {
+    println!("[PDF生成] 开始生成，文本长度: {}", text.len());
     let conf = fountain::Conf::default();
     let mut parser = fountain::FountainParser::new();
     let parsed = parser.parse(&text, &conf, false, None);
+    
+    println!("[PDF生成] 解析完成，tokens数量: {}", parsed.tokens.len());
     
     let (doc, page1, layer1) = PdfDocument::new(
         "Fountain Script",
@@ -242,6 +245,7 @@ async fn export_pdf_base64(text: String) -> Result<String, String> {
     let line_height = 5.0;
     let margin_left = 25.0;
     
+    let mut rendered_count = 0;
     for token in &parsed.tokens {
         let token_type = &token.token_type;
         let text_content = token.clean_text();
@@ -249,6 +253,8 @@ async fn export_pdf_base64(text: String) -> Result<String, String> {
         if text_content.is_empty() {
             continue;
         }
+        
+        rendered_count += 1;
         
         if y_position < 20.0 {
             let (new_page, new_layer) = doc.add_page(Mm(215.9), Mm(279.4), "Page");
@@ -284,10 +290,14 @@ async fn export_pdf_base64(text: String) -> Result<String, String> {
         }
     }
     
+    println!("[PDF生成] 渲染了 {} 个token", rendered_count);
+    
     let buffer = doc.save_to_bytes().map_err(|e| e.to_string())?;
+    println!("[PDF生成] PDF字节长度: {}", buffer.len());
     
     use base64::Engine;
     let base64_str = base64::engine::general_purpose::STANDARD.encode(&buffer);
+    println!("[PDF生成] Base64长度: {}", base64_str.len());
     
     Ok(format!("data:application/pdf;base64,{}", base64_str))
 }

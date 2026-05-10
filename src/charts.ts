@@ -417,7 +417,7 @@ export function renderSceneChart(containerId: string, scenes: any[], totalTime: 
     const typeStr = sceneTypeLabel(scene.type);
     const timeStr = sceneTimeLabel(scene.time);
 
-    // 内外景层
+    const timeVal = scene.time === 'evening' ? 'dusk' : (scene.time || 'unspecified');
     barcodecontainer
       .append("rect")
       .attr("class", "chart-data-barcode")
@@ -426,7 +426,7 @@ export function renderSceneChart(containerId: string, scenes: any[], totalTime: 
       .attr("height", innerHeight / 2)
       .attr("data-x", scene.line)
       .attr("data-xend", scene.endline)
-      .attr("data-y", sceneType)
+      .attr("data-y", timeVal)
       .attr("data-scene-text", encodeURIComponent(scene.scene || ""))
       .attr("y", headerHeight)
       .on("mouseover", function (event: MouseEvent) {
@@ -449,8 +449,6 @@ export function renderSceneChart(containerId: string, scenes: any[], totalTime: 
         hideTooltip(tooltip);
       });
 
-    // 时间段层
-    const timeVal = scene.time === 'evening' ? 'dusk' : (scene.time || 'unspecified');
     barcodecontainer
       .append("rect")
       .attr("class", "chart-data-barcode")
@@ -459,7 +457,7 @@ export function renderSceneChart(containerId: string, scenes: any[], totalTime: 
       .attr("height", innerHeight / 2)
       .attr("data-x", scene.line)
       .attr("data-xend", scene.endline)
-      .attr("data-y", timeVal)
+      .attr("data-y", sceneType)
       .attr("data-scene-text", encodeURIComponent(scene.scene || ""))
       .attr("y", headerHeight + innerHeight / 2)
       .on("mouseover", function (event: MouseEvent) {

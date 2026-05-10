@@ -583,12 +583,15 @@ function buildOutlineTree() {
   const ul = document.createElement("ul");
   ul.className = "outline-list";
 
-  // 分离备注节点和其他节点
+  // 分离备注节点、书签节点和其他节点
   const noteNodes: any[] = [];
+  const bookmarkNodes: any[] = [];
   const otherNodes: any[] = [];
   for (const token of structure) {
     if (token.isnote) {
       noteNodes.push(token);
+    } else if (token.is_bookmark || token.isBookmark) {
+      bookmarkNodes.push(token);
     } else {
       otherNodes.push(token);
     }
@@ -628,12 +631,46 @@ function buildOutlineTree() {
     
     const noteUl = document.createElement("ul");
     for (const note of noteNodes) {
-      const noteLi = buildOutlineItemSimple(note, { showScenes, showSections, showDialogue, showSynopses, showNotes }, 0);
+      const noteLi = buildOutlineItemSimple(note, { showScenes, showSections, showDialogue, showSynopses, showNotes }, 1);
       if (noteLi) noteUl.appendChild(noteLi);
     }
     noteGroup.appendChild(noteUl);
     
     ul.appendChild(noteGroup);
+  }
+
+  // 如果有书签节点，创建统一的 BOOKMARKS 节点（放在最后）
+  if (bookmarkNodes.length > 0) {
+    const bookmarkGroup = document.createElement("li");
+    bookmarkGroup.className = "outline-item outline-bookmark-group";
+    
+    const row = document.createElement("div");
+    row.className = "outline-row";
+    
+    const toggle = document.createElement("span");
+    toggle.className = "outline-toggle";
+    toggle.textContent = "▶";
+    toggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      bookmarkGroup.classList.toggle("collapsed");
+    });
+    row.appendChild(toggle);
+    
+    const span = document.createElement("span");
+    span.className = "outline-label";
+    span.innerHTML = "🔖 BOOKMARKS";
+    row.appendChild(span);
+    
+    bookmarkGroup.appendChild(row);
+    
+    const bookmarkUl = document.createElement("ul");
+    for (const bookmark of bookmarkNodes) {
+      const bookmarkLi = buildOutlineItemSimple(bookmark, { showScenes, showSections, showDialogue, showSynopses, showNotes }, 1);
+      if (bookmarkLi) bookmarkUl.appendChild(bookmarkLi);
+    }
+    bookmarkGroup.appendChild(bookmarkUl);
+    
+    ul.appendChild(bookmarkGroup);
   }
 
   container.innerHTML = "";
@@ -686,6 +723,8 @@ function buildOutlineItems(token: any, opts: any, depth: number): (HTMLElement |
     results.push(buildOutlineItemSimple(token, opts, depth));
   } else if (token.isnote) {
     if (!opts.showNotes) return results;
+    results.push(buildOutlineItemSimple(token, opts, depth));
+  } else if (token.is_bookmark || token.isBookmark) {
     results.push(buildOutlineItemSimple(token, opts, depth));
   }
   
@@ -869,6 +908,10 @@ function buildOutlineItemSimple(token: any, _opts: any, depth: number): HTMLElem
     icon = "📝";
     label = token.text;
     li.classList.add("outline-note");
+  } else if (token.is_bookmark || token.isBookmark) {
+    icon = "🔖";
+    label = token.text;
+    li.classList.add("outline-bookmark");
   } else {
     return null;
   }

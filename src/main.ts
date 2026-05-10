@@ -1449,14 +1449,14 @@ function updateAllPanels() {
   updateStatsOverview();
   buildOutlineTree();
   updateDocxPreview();
-  updatePdfPreview();
+  // updatePdfPreview();
 }
 
 // ==================== 启动 ====================
 
 window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("open-btn")?.addEventListener("click", openFile);
-  document.getElementById("export-pdf-btn")?.addEventListener("click", exportPdf);
+  // document.getElementById("export-pdf-btn")?.addEventListener("click", exportPdf);
   document.getElementById("export-docx-btn")?.addEventListener("click", exportDocx);
   document.getElementById("refresh-btn")?.addEventListener("click", () => {
     if (!currentFilePath) return;
@@ -1481,7 +1481,7 @@ document.getElementById("settings-modal")?.addEventListener("click", (e) => {
   loadEditorSettings();
   loadAutoRefreshSettings();
   setupDocxZoomControls();
-  setupPdfControls();
+  // setupPdfControls();
 
   listen("file-changed", () => refreshFile());
 

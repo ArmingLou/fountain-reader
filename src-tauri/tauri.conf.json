@@ -55,6 +55,16 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["fountain"],
+        "name": "Fountain Screenplay",
+        "description": "Fountain format screenplay file",
+        "role": "Viewer",
+        "mimeType": "text/plain",
+        "rank": "Owner"
+      }
     ]
   }
 }

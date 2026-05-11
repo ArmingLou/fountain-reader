@@ -16,6 +16,9 @@ const SINGLE_INSTANCE_PORT: u16 = 16658;
 struct AppState {
     watched_file: Mutex<Option<PathBuf>>,
     stop_watcher: Mutex<Option<std::sync::mpsc::Sender<()>>>,
+    /// 由 RunEvent::Opened (macOS 双击) 设置的文件路径，
+    /// 供前端 get_cli_args 兜底查询
+    opened_file: Mutex<Option<PathBuf>>,
 }
 
 #[tauri::command]
@@ -302,11 +305,50 @@ async fn export_pdf_base64(text: String) -> Result<String, String> {
     Ok(format!("data:application/pdf;base64,{}", base64_str))
 }
 
+/// 校验路径是否是指定的剧本文件（以 .fountain / .spmd / .txt 结尾）
+fn is_fountain_file(path: &str) -> bool {
+    let lower = path.to_lowercase();
+    lower.ends_with(".fountain") || lower.ends_with(".spmd") || lower.ends_with(".txt")
+}
+
+/// 去除字符串首尾的引号（单引号或双引号）
+fn trim_quotes(s: &str) -> &str {
+    let s = s.trim();
+    if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
+        &s[1..s.len()-1]
+    } else {
+        s
+    }
+}
+
 #[tauri::command]
 async fn open_in_editor(app: tauri::AppHandle, file_path: String, line: u32, editor: Option<String>, template: Option<String>) -> Result<String, String> {
+    // 清洗多余的引号（前端某些路径可能被序列化时带了引号）
+    let file_path = trim_quotes(&file_path).to_string();
+    let editor = editor.as_deref().map(trim_quotes).map(|s| s.to_string());
+
+    eprintln!("[open_in_editor] raw file_path='{file_path}', line={line}, editor={editor:?}, template={template:?}");
+
+    // 兜底：file_path 可能为空（冷启动时序问题），从 AppState 获取
+    let file_path = if file_path.is_empty() {
+        if let Some(state) = app.try_state::<AppState>() {
+            state.opened_file.lock().unwrap().as_ref().map(|p| p.to_string_lossy().to_string()).unwrap_or_default()
+        } else {
+            file_path
+        }
+    } else {
+        file_path
+    };
+    eprintln!("[open_in_editor] resolved file_path='{file_path}'");
+    if file_path.is_empty() {
+        return Err("未找到文件路径".to_string());
+    }
+
     let line = line + 1; // 转换为 1-based 行号
-    let cmd = if let Some(tmpl) = template.filter(|t| !t.is_empty()) {
-        tmpl.replace("{file}", &file_path).replace("{line}", &line.to_string())
+    let line_str = line.to_string();
+
+    let cmd: String = if let Some(tmpl) = template.filter(|t| !t.is_empty()) {
+        tmpl.replace("{file}", &file_path).replace("{line}", &line_str)
     } else {
         let name = editor.unwrap_or_else(|| "zed".to_string());
         match name.as_str() {
@@ -318,15 +360,81 @@ async fn open_in_editor(app: tauri::AppHandle, file_path: String, line: u32, edi
         }
     };
 
-    let shell = app.shell();
-    let output = shell.command("sh").args(["-c", &cmd]).output().await
-        .map_err(|e| format!("Failed to launch editor: {}", e))?;
+    // 拆分为 program + args，用 which 解析二进制路径后直接执行
+    // 不通过中间 shell，避免 .app PATH 受限找不到编辑器
+    let parts: Vec<&str> = cmd.split_whitespace().collect();
+    if parts.is_empty() {
+        return Err("编辑器命令为空".to_string());
+    }
+
+    let program = parts[0];
+    let args: Vec<&str> = parts[1..].to_vec();
+
+    // 优先用 which 解析路径（继承当前进程 PATH，终端启动可用）
+    // 失败时回退到常见路径
+    let resolved = which_path(program);
+
+    let output = app.shell()
+        .command(&resolved)
+        .args(&args)
+        .output()
+        .await
+        .map_err(|e| format!("编辑器: {} — 启动失败: {}", program, e))?;
 
     if output.status.success() {
         Ok("Editor opened".to_string())
     } else {
-        Err(format!("Editor exited with error: {}", String::from_utf8_lossy(&output.stderr)))
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("编辑器: {} — 错误: {}", program, stderr))
     }
+}
+
+/// 解析命令路径：先查 which，再查常见 homebrew 路径，
+/// 最后解析符号链接到真实路径（canonicalize）
+fn which_path(name: &str) -> String {
+    // 如果是绝对路径，直接返回（Unix /xxx 或 Windows C:\xxx）
+    if std::path::Path::new(name).is_absolute() {
+        if let Ok(canonical) = std::fs::canonicalize(name) {
+            return canonical.to_string_lossy().to_string();
+        }
+        return name.to_string();
+    }
+
+    // 尝试 which（终端启动时继承完整 PATH，能找到）
+    if let Ok(output) = std::process::Command::new("which")
+        .arg(name)
+        .output()
+    {
+        if output.status.success() {
+            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path.is_empty() {
+                // 解析符号链接到真实路径
+                if let Ok(canonical) = std::fs::canonicalize(&path) {
+                    return canonical.to_string_lossy().to_string();
+                }
+                return path;
+            }
+        }
+    }
+
+    // 回退：常见路径列表
+    let candidates = [
+        format!("/opt/homebrew/bin/{}", name),
+        format!("/usr/local/bin/{}", name),
+        format!("/usr/bin/{}", name),
+    ];
+
+    for candidate in &candidates {
+        if std::path::Path::new(candidate).exists() {
+            if let Ok(canonical) = std::fs::canonicalize(candidate) {
+                return canonical.to_string_lossy().to_string();
+            }
+            return candidate.clone();
+        }
+    }
+
+    // 都没找到，返回原始名称（让 shell 插件报错）
+    name.to_string()
 }
 
 #[tauri::command]
@@ -353,8 +461,9 @@ fn get_cli_args() -> serde_json::Value {
 pub fn run() {
     let cli_args = std::env::args().collect::<Vec<_>>();
 
+    // 单实例检查：如果已有实例运行，转发参数
     if let Ok(mut stream) = std::net::TcpStream::connect(format!("127.0.0.1:{}", SINGLE_INSTANCE_PORT)) {
-        let payload = cli_args.join(" ");
+        let payload = cli_args.join("\n");
         let _ = stream.write_all(payload.as_bytes());
         println!("Forwarded CLI args to running instance, exiting.");
         return;
@@ -364,6 +473,7 @@ pub fn run() {
         .manage(AppState {
             watched_file: Mutex::new(None),
             stop_watcher: Mutex::new(None),
+            opened_file: Mutex::new(None),
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -372,29 +482,41 @@ pub fn run() {
         .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![greet, parse_fountain, read_file, export_docx, export_docx_base64, export_pdf, export_pdf_base64, watch_file, unwatch_file, open_in_editor, get_cli_args])
-        .setup(|app| {
+        .setup(move |app| {
             let handle = app.handle().clone();
+
+            // 单实例 TCP 监听（接收后续 CLI 调用转发的参数）
             std::thread::spawn(move || {
                 let listener = TcpListener::bind(format!("127.0.0.1:{}", SINGLE_INSTANCE_PORT)).unwrap();
                 for stream in listener.incoming() {
                     if let Ok(mut s) = stream {
                         let mut buf = String::new();
                         if s.read_to_string(&mut buf).is_ok() {
-                            // 提取文件路径（第一个参数）
-                            let parts: Vec<&str> = buf.split_whitespace().collect();
-                            if let Some(file) = parts.get(1) {
-                                if !file.starts_with('-') {
-                                    let _ = handle.emit("cli-file", file.to_string());
+                            // payload 格式: "arg0\narg1\narg2\n..."（换行符分隔，避免空格破坏路径）
+                            let raw: Vec<&str> = buf.split('\n').filter(|s| !s.is_empty()).collect();
+                            // 找到源文件：跳过二进制名（raw[0]），取第一个非 -e/--editor 值的非 flag 参数
+                            let mut file: Option<String> = None;
+                            let mut ed: Option<String> = None;
+                            let mut i = 1;
+                            while i < raw.len() {
+                                if raw[i] == "-e" || raw[i] == "--editor" {
+                                    if i + 1 < raw.len() {
+                                        ed = Some(raw[i + 1].to_string());
+                                        i += 2;
+                                        continue;
+                                    }
                                 }
+                                if !raw[i].starts_with('-') && file.is_none() {
+                                    file = Some(raw[i].to_string());
+                                }
+                                i += 1;
                             }
-                            let editor = buf.split_whitespace()
-                                .skip_while(|a| *a != "-e" && *a != "--editor")
-                                .nth(1)
-                                .map(|s| s.to_string());
-                            if let Some(ed) = editor {
-                                let _ = handle.emit("cli-editor", ed);
+                            if let Some(ref f) = file {
+                                let _ = handle.emit("cli-file", f);
                             }
-                            // 激活窗口到最前面
+                            if let Some(ref e) = ed {
+                                let _ = handle.emit("cli-editor", e);
+                            }
                             if let Some(window) = handle.get_webview_window("main") {
                                 let _ = window.show();
                                 let _ = window.set_focus();
@@ -404,6 +526,7 @@ pub fn run() {
                 }
             });
 
+            // 处理 CLI 参数（CLI 启动时）
             if let Ok(cli) = app.cli().matches() {
                 if let Some(source) = cli.args.get("source") {
                     let path = source.value.to_string();
@@ -422,7 +545,7 @@ pub fn run() {
                 let editor = cli.args.get("editor").map(|s| s.value.to_string());
                 let h2 = h.clone();
                 std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_secs(1));
+                    std::thread::sleep(std::time::Duration::from_secs(2));
                     if let Some(ref path) = source {
                         let _ = h2.emit("cli-file", path);
                     }
@@ -433,6 +556,42 @@ pub fn run() {
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            // 处理 macOS 文件关联事件（双击 .fountain 文件打开应用）
+            // 同时处理应用已运行时通过 Dock 或 Finder 打开的额外文件
+            if let tauri::RunEvent::Opened { urls } = event {
+                let files: Vec<String> = urls
+                    .into_iter()
+                    .filter_map(|url| {
+                        // macOS 传递的是 file:// URL
+                        if url.scheme() == "file" {
+                            url.to_file_path().ok().map(|p| p.to_string_lossy().to_string())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                if let Some(file_path) = files.first() {
+                    eprintln!("[RunEvent::Opened] file_path='{file_path}'");
+                    // 存储到 AppState，供前端 get_cli_args 兜底查询
+                    let state = app.state::<AppState>();
+                    *state.opened_file.lock().unwrap() = Some(PathBuf::from(file_path));
+                    eprintln!("[RunEvent::Opened] stored to AppState.opened_file");
+                    let handle = app.clone();
+                    let path = file_path.clone();
+                    // 立即发送一次（覆盖热启动场景，前端已就绪）
+                    let _ = app.emit("cli-file", &path);
+                    eprintln!("[RunEvent::Opened] emitted cli-file immediately");
+                    // 延迟重发，确保冷启动时 WebView 前端已完成 listen 注册
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_secs(1));
+                        let _ = handle.emit("cli-file", &path);
+                        eprintln!("[RunEvent::Opened] emitted cli-file delayed");
+                    });
+                }
+            }
+        });
 }
